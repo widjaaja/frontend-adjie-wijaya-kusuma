@@ -1,7 +1,11 @@
+import React, { useEffect, useState } from 'react';
 import Head from "next/head";
-import Image from "next/image";
+import axios from 'axios';
+import { Button, Form, Input, InputNumber, Select, Space } from 'antd';
 import { Geist, Geist_Mono } from "next/font/google";
 import styles from "@/styles/Home.module.css";
+
+const { TextArea } = Input;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,6 +18,92 @@ const geistMono = Geist_Mono({
 });
 
 export default function Home() {
+  const [form] = Form.useForm();
+  const [listNegara, setListNegara] = useState([]);
+  const [listPelabuhan, setListPelabuhan] = useState([]);
+  const [listBarang, setListBarang] = useState([]);
+  const [listFilteredPelabuhan, setListFilteredPelabuhan] = useState([]);
+  const [listFilteredBarang, setListFilteredBarang] = useState([]);
+  const [fieldPelabuhanDisabled, setFieldPelabuhanDisabled] = useState(true);
+  const [fieldBarangDisabled, setFieldBarangDisabled] = useState(true);
+  const [fieldBarangDeskripsi, setFieldBarangDeskripsi] = useState('');
+  const [fieldDiscount, setFieldDiscount] = useState(0);
+  const [fieldHarga, setFieldHarga] = useState(0);
+  const [fieldTotal, setFieldTotal] = useState(0);
+
+  useEffect(() => {
+    // get negara
+    axios.get('http://202.157.176.100:3001/negaras')
+      .then(response => {
+        console.log(response.data);
+        setListNegara(response.data)
+      })
+      .catch(err => {
+        setError('Failed to fetch data');
+        console.error(err);
+      });
+
+    // get pelabuhan
+    axios.get('http://202.157.176.100:3001/pelabuhans')
+      .then(response => {
+        console.log(response.data);
+        setListPelabuhan(response.data)
+      })
+      .catch(err => {
+        setError('Failed to fetch data');
+        console.error(err);
+      });
+
+    // get barang
+    axios.get('http://202.157.176.100:3001/barangs')
+      .then(response => {
+        console.log(response.data);
+        setListBarang(response.data)
+      })
+      .catch(err => {
+        setError('Failed to fetch data');
+        console.error(err);
+      });
+
+  }, []);
+
+  const onChangeNegara = (value) => {
+    console.log(value);
+    let filteredData = listPelabuhan.filter((data) => data.id_negara.toString() === value.toString());
+    console.log(filteredData, listPelabuhan);
+    setListFilteredPelabuhan(filteredData)
+    setFieldPelabuhanDisabled(false)
+  };
+
+  const onChangePelabuhan = (value) => {
+    console.log(value);
+    let filteredData = listBarang.filter((data) => data.id_pelabuhan.toString() === value.toString());
+    console.log(filteredData, listBarang);
+    setListFilteredBarang(filteredData)
+    setFieldBarangDisabled(false)
+  };
+
+  const onChangeBarang = (value) => {
+    let filteredData = listBarang.filter((data) => data.id_barang.toString() === value.toString())[0];
+    let totalHarga = filteredData.harga - (fieldDiscount * filteredData.harga / 100)
+
+    setFieldBarangDeskripsi(filteredData.description)
+    setFieldHarga(filteredData.harga)
+    form.setFieldsValue({ harga: filteredData.harga, total: totalHarga});
+  };
+
+  const onChangeDiscount = (value) => {
+    console.log(value, fieldHarga, fieldHarga - (value * fieldHarga / 100));
+    let totalHarga = fieldHarga - (value * fieldHarga / 100)
+    
+    setFieldDiscount(value);
+    setFieldTotal(fieldHarga - (value * fieldHarga / 100))
+    form.setFieldsValue({ discount: value, total: totalHarga });
+  };
+
+  const onFinish = (values) => {
+    console.log(values);
+  };
   return (
     <>
       <Head>
@@ -26,7 +116,93 @@ export default function Home() {
         className={`${styles.page} ${geistSans.variable} ${geistMono.variable}`}
       >
         <main className={styles.main}>
-          <Image
+          <h1>Form</h1>
+          <Form
+            // {...layout}
+            layout="vertical"
+            form={form}
+            name="control-hooks"
+            onFinish={onFinish}
+          >
+
+            <Form.Item 
+              name="negara" 
+              label="Negara"  
+              rules={[{ required: true, message: 'Please input your negara!' }]}
+            >
+              <Select
+                onChange={onChangeNegara}
+                allowClear
+              >
+                {listNegara.map(data => (
+                  <option key={data.id_negara} value={data.id_negara}>
+                    {data.nama_negara}
+                  </option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item name="pelabuhan" label="Pelabuhan" rules={[{ required: true }]}>
+              <Select
+                disabled={fieldPelabuhanDisabled}
+                onChange={onChangePelabuhan}
+                allowClear
+              >
+                {listFilteredPelabuhan.map(data => (
+                  <option key={data.id_pelabuhan} value={data.id_pelabuhan}>
+                    {data.nama_pelabuhan}
+                  </option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item name="barang" label="Barang" rules={[{ required: true }]}>
+              <Select
+                disabled={fieldBarangDisabled}
+                onChange={onChangeBarang}
+                allowClear
+              >
+                {listFilteredBarang.map(data => (
+                  <option key={data.id_barang} value={data.id_barang}>
+                    {data.nama_barang}
+                  </option>
+                ))}
+              </Select>
+              <br/><br/>
+              <TextArea disabled={true} rows={3} value={fieldBarangDeskripsi}/>
+            </Form.Item>
+            <Space wrap >
+            <Form.Item name="discount" label="Discount" rules={[{ required: true }]}>
+              <InputNumber
+                onChange={onChangeDiscount}
+                addonAfter="%" 
+                defaultValue={fieldDiscount} 
+                value={fieldDiscount}
+                min={0} 
+                max={100} 
+              />
+            </Form.Item>
+            <Form.Item name="harga" label="Harga" rules={[{ required: true }]}>
+              <InputNumber
+                readOnly={true}
+                addonBefore="Rp." 
+                defaultValue={fieldHarga} 
+                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                parser={(value) => value?.replace(/\$\s?|(,*)/g, '')}
+              />
+            </Form.Item>
+            </Space>
+            <Form.Item name="total" label="Total" rules={[{ required: true }]}>
+              <InputNumber 
+                style={{ width: '100%' }}  
+                addonBefore="Rp." 
+                readOnly={true}                 
+                defaultValue={fieldTotal} 
+                value={fieldTotal}
+                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                parser={(value) => value?.replace(/\$\s?|(,*)/g, '')}
+              />
+            </Form.Item>
+          </Form>
+          {/* <Image
             className={styles.logo}
             src="/next.svg"
             alt="Next.js logo"
@@ -39,9 +215,9 @@ export default function Home() {
               Get started by editing <code>src/pages/index.js</code>.
             </li>
             <li>Save and see your changes instantly.</li>
-          </ol>
+          </ol> */}
 
-          <div className={styles.ctas}>
+          {/* <div className={styles.ctas}>
             <a
               className={styles.primary}
               href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
@@ -65,9 +241,9 @@ export default function Home() {
             >
               Read our docs
             </a>
-          </div>
+          </div> */}
         </main>
-        <footer className={styles.footer}>
+        {/* <footer className={styles.footer}>
           <a
             href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
             target="_blank"
@@ -110,7 +286,7 @@ export default function Home() {
             />
             Go to nextjs.org →
           </a>
-        </footer>
+        </footer> */}
       </div>
     </>
   );
